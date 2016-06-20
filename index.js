@@ -277,6 +277,9 @@ Siegrune.prototype.listen = function(){
 					res.send(file);
 				}
 				
+				// 请求字符串
+				req.QUERY = urlobj.query ? qs.parse(urlobj.query) || {};
+				
 				// 处理请求
 				if('string' == typeof matched){
 					res.send(matched);
