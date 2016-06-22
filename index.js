@@ -66,6 +66,31 @@ var Siegrune = function(){
 	
 	// 服务器
 	this._server = http.createServer();
+	
+	// 渲染器
+	this.renderer = function(view, args, cb){
+		var res = this;
+		fs.readFile(view, function(err, buf){
+			if(err){
+				res.statusCode = 403;
+				res.send(new Buffer('403 - Forbidden'));
+				if(typeof cb == 'function') cb.call(null, new Error('Read File Error'));
+				return;
+			}else{
+				var str = buf.toString();
+				if('object' == typeof args){
+					for(var i in args){
+						var reg = new RegExp('\\{\\$' + i + '\\}', 'gm');
+						str = str.replace(reg, args[i]);
+					}
+				}
+				
+				res.send(new Buffer(str));
+				if(typeof cb == 'function') cb.call(null);
+				return;
+			}
+		});
+	}
 }
 
 // 添加域名
@@ -126,10 +151,17 @@ Siegrune.prototype.post = function(matcher, handle){
 	this.add('POST', matcher, handle);
 }
 
+// 设置渲染器
+Siegrune.prototype.setRenderer = function(cb){
+	assert(typeof cb == 'function', 'Invalid renderer type');
+	this.renderer = cb;
+}
+
 // 监听端口
 Siegrune.prototype.listen = function(){
 	var route = this.route;
 	var hostname = this.hostname;
+	var renderer = this.renderer;
 	this._server.on('request', function(req, res){
 		var host = req.headers['host'] || '';
 		
@@ -278,7 +310,12 @@ Siegrune.prototype.listen = function(){
 				}
 				
 				// 请求字符串
-				req.QUERY = urlobj.query ? qs.parse(urlobj.query) || {};
+				req.QUERY = urlobj.query ? qs.parse(urlobj.query) : {};
+				
+				// 添加渲染器
+				res.render = function(){
+					renderer.apply(res, arguments);
+				}
 				
 				// 处理请求
 				if('string' == typeof matched){
